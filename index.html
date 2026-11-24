@@ -3,7 +3,78 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HK MTR Real-Time Arrivals | 港鐵實時列車到站時間</title>
+  <title>Hong Kong MTR Real-Time Train Arrivals | Live Next Train Schedule</title>
+  <meta id="meta-description" name="description" content="Check live Hong Kong MTR train arrival times, platforms, and service status across all 10 MTR lines using official DATA.GOV.HK real-time data." />
+  <meta id="meta-keywords" name="keywords" content="Hong Kong MTR, MTR real-time arrivals, MTR next train, HK subway schedule, MTR arrival time, 港鐵實時到站, 港鐵下一班車" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+
+  <!-- GEO / Local SEO Tags -->
+  <meta name="geo.region" content="HK" />
+  <meta name="geo.placename" content="Hong Kong" />
+  <meta name="geo.position" content="22.3193;114.1694" />
+  <meta name="ICBM" content="22.3193, 114.1694" />
+
+  <!-- Open Graph & Twitter Cards -->
+  <meta id="og-title" property="og:title" content="Hong Kong MTR Real-Time Train Arrivals | Live Next Train Schedule" />
+  <meta id="og-description" property="og:description" content="Check live Hong Kong MTR train arrival times, platforms, and service status across all 10 MTR lines." />
+  <meta id="og-locale" property="og:locale" content="en_HK" />
+  <meta property="og:locale:alternate" content="zh_HK" />
+  <meta property="og:type" content="website" />
+  <meta id="twitter-title" name="twitter:title" content="Hong Kong MTR Real-Time Train Arrivals" />
+  <meta id="twitter-description" name="twitter:description" content="Live Hong Kong MTR next train arrival times and platform numbers across all 10 lines." />
+  <meta name="twitter:card" content="summary" />
+
+  <!-- Bilingual hreflang (populated dynamically on http/https) -->
+
+  <!-- Featured Snippet & Structured Data (JSON-LD) -->
+  <script id="ld-json-seo" type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "name": "Hong Kong MTR Real-Time Train Arrivals",
+        "applicationCategory": "TravelApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "en",
+        "areaServed": { "@type": "Place", "name": "Hong Kong" },
+        "description": "Live Hong Kong MTR next train arrival times, platform numbers, and service alerts across all 10 lines."
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How often does the Hong Kong MTR real-time arrival schedule update?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The official DATA.GOV.HK MTR Next Train API updates every 10 seconds with live platform numbers, destinations, and estimated arrival times in Hong Kong Time (HKT)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which MTR lines are supported in the real-time arrival tracker?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "All 10 Hong Kong MTR lines are supported: Airport Express (AEL), Tung Chung Line (TCL), Tuen Ma Line (TML), Tseung Kwan O Line (TKL), East Rail Line (EAL), South Island Line (SIL), Tsuen Wan Line (TWL), Island Line (ISL), Kwun Tong Line (KTL), and Disneyland Resort Line (DRL)."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Google Tag Manager (Replace GTM-XXXXXXX with your Container ID) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-XXXXXXX');
+  </script>
+  <!-- End Google Tag Manager -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -78,6 +149,9 @@
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
+  <!-- Google Tag Manager (noscript) (Replace GTM-XXXXXXX with your Container ID) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
   <!-- Top Navigation Bar -->
   <header class="bg-[#001F3F] text-white shadow-md sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -244,6 +318,17 @@
           <div id="down-list" class="p-3 space-y-2.5 flex-1"></div>
         </div>
       </div>
+    </section>
+
+    <!-- Bilingual FAQ / Featured Snippet Section -->
+    <section aria-label="FAQ" class="surface-card border rounded-2xl p-4 sm:p-5 shadow-sm">
+      <details class="group">
+        <summary class="flex items-center justify-between cursor-pointer list-none font-bold text-sm text-main">
+          <span id="faq-heading">Quick Guide &amp; FAQ (HK MTR Real-Time Schedule)</span>
+          <span class="text-mut text-xs group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div id="faq-content" class="mt-3 pt-3 border-t border-base grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-sub leading-relaxed"></div>
+      </details>
     </section>
   </main>
 
@@ -548,7 +633,7 @@
     }
 
     const state = {
-      lang: loadStorage('mtr_lang', 'en'),
+      lang: (new URLSearchParams(window.location.search).get('lang') === 'tc' ? 'tc' : (new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : loadStorage('mtr_lang', 'en'))),
       dark: loadStorage('mtr_dark', false),
       line: loadStorage('mtr_line', 'TKL'),
       sta: loadStorage('mtr_sta', 'TKO'),
@@ -623,8 +708,116 @@
     };
 
     // =========================================================================
-    // 5. HELPERS
+    // 5. HELPERS (GTM, SEO/GEO & UTILITIES)
     // =========================================================================
+    function trackEvent(eventName, params = {}) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: eventName,
+        ...params
+      });
+    }
+
+    const SEO_DATA = {
+      en: {
+        htmlLang: 'en',
+        title: 'Hong Kong MTR Real-Time Train Arrivals | Live Next Train Schedule',
+        description: 'Check live Hong Kong MTR train arrival times, platforms, and service status across all 10 MTR lines using official DATA.GOV.HK real-time data.',
+        keywords: 'Hong Kong MTR, MTR real-time arrivals, MTR next train, HK subway schedule, MTR arrival time',
+        ogLocale: 'en_HK',
+        faqHeading: 'Quick Guide & FAQ (HK MTR Real-Time Schedule)',
+        faqs: [
+          {
+            q: 'How often does the Hong Kong MTR real-time arrival schedule update?',
+            a: 'The official DATA.GOV.HK MTR Next Train API updates every 10 seconds with live platform numbers, destinations, and estimated arrival times in Hong Kong Time (HKT).'
+          },
+          {
+            q: 'Which MTR lines are supported in this arrival tracker?',
+            a: 'All 10 Hong Kong MTR lines are supported: Airport Express (AEL), Tung Chung Line (TCL), Tuen Ma Line (TML), Tseung Kwan O Line (TKL), East Rail Line (EAL), South Island Line (SIL), Tsuen Wan Line (TWL), Island Line (ISL), Kwun Tong Line (KTL), and Disneyland Resort Line (DRL).'
+          }
+        ]
+      },
+      tc: {
+        htmlLang: 'zh-Hant-HK',
+        title: '香港港鐵實時列車到站時間 | 港鐵下一班車班次預報',
+        description: '即時查詢香港港鐵全港 10 條路綫列車實時到站時間、月台編號及車務狀況，採用 DATA.GOV.HK 官方實時開放數據，每 10 秒自動更新。',
+        keywords: '港鐵實時到站, 港鐵下一班車, 香港地鐵時間表, MTR 到站時間, 港鐵班次查詢',
+        ogLocale: 'zh_HK',
+        faqHeading: '常見問題與使用指南（港鐵實時列車到站資訊）',
+        faqs: [
+          {
+            q: '香港港鐵實時到站時間多久更新一次？',
+            a: '本工具連接香港政府「資料一線通」(DATA.GOV.HK) 港鐵實時列車數據，每 10 秒自動更新一次，提供香港時間 (HKT) 的預計抵站時間、月台編號及列車目的地。'
+          },
+          {
+            q: '系統支援查詢哪些港鐵路綫？',
+            a: '支援全港 10 條港鐵路綫：機場快綫 (AEL)、東涌綫 (TCL)、屯馬綫 (TML)、將軍澳綫 (TKL)、東鐵綫 (EAL)、南港島綫 (SIL)、荃灣綫 (TWL)、港島綫 (ISL)、觀塘綫 (KTL) 及迪士尼綫 (DRL)。'
+          }
+        ]
+      }
+    };
+
+    function updateSeoGeoTags() {
+      const seo = SEO_DATA[state.lang] || SEO_DATA.en;
+      const staName = getStationName(state.sta);
+      const lineName = getLineName(state.line);
+      const dynamicTitle = state.lang === 'tc'
+        ? `${staName} (${lineName}) 實時到站時間 | ${seo.title}`
+        : `${staName} (${lineName}) Live Arrivals | ${seo.title}`;
+
+      document.documentElement.lang = seo.htmlLang;
+      document.title = dynamicTitle;
+
+      const setMeta = (id, attr, val) => {
+        const node = document.getElementById(id);
+        if (node) node.setAttribute(attr, val);
+      };
+      setMeta('meta-description', 'content', seo.description);
+      setMeta('meta-keywords', 'content', seo.keywords);
+      setMeta('og-title', 'content', dynamicTitle);
+      setMeta('og-description', 'content', seo.description);
+      setMeta('og-locale', 'content', seo.ogLocale);
+      setMeta('twitter-title', 'content', dynamicTitle);
+      setMeta('twitter-description', 'content', seo.description);
+
+      const ldNode = document.getElementById('ld-json-seo');
+      if (ldNode) {
+        ldNode.textContent = JSON.stringify({
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebApplication',
+              name: seo.title,
+              applicationCategory: 'TravelApplication',
+              operatingSystem: 'Web',
+              inLanguage: seo.htmlLang,
+              areaServed: { '@type': 'Place', name: 'Hong Kong' },
+              description: seo.description
+            },
+            {
+              '@type': 'FAQPage',
+              mainEntity: seo.faqs.map(item => ({
+                '@type': 'Question',
+                name: item.q,
+                acceptedAnswer: { '@type': 'Answer', text: item.a }
+              }))
+            }
+          ]
+        });
+      }
+
+      const faqHeading = document.getElementById('faq-heading');
+      const faqContent = document.getElementById('faq-content');
+      if (faqHeading) faqHeading.textContent = seo.faqHeading;
+      if (faqContent) {
+        faqContent.innerHTML = seo.faqs.map(item => `
+          <div>
+            <h3 class="font-bold text-main mb-1">${escapeHtml(item.q)}</h3>
+            <p>${escapeHtml(item.a)}</p>
+          </div>
+        `).join('');
+      }
+    }
     function t(key) {
       return I18N[state.lang][key] || key;
     }
@@ -777,6 +970,7 @@
       renderLinePills();
       renderStationStrip();
       renderStationHeader();
+      updateSeoGeoTags();
       fetchSchedule();
     }
 
@@ -801,6 +995,7 @@
       el.downDirLabel.textContent = t('towards');
       applyTheme();
       renderAutoButton();
+      updateSeoGeoTags();
     }
 
     function renderAutoButton() {
@@ -1190,7 +1385,15 @@
 
     // Event Listeners
     el.btnLang.addEventListener('click', () => {
-      state.lang = state.lang === 'en' ? 'tc' : 'en';
+      const prevLang = state.lang;
+      const nextLang = prevLang === 'en' ? 'tc' : 'en';
+      trackEvent('switch_language', {
+        from_language: prevLang,
+        to_language: nextLang,
+        line_code: state.line,
+        station_code: state.sta
+      });
+      state.lang = nextLang;
       saveStorage('mtr_lang', state.lang);
       renderChromeText();
       renderFavorites();
@@ -1245,6 +1448,13 @@
       if (!line) return;
       // Keep current station if it exists on the new line; otherwise pick first station
       const nextSta = line.stations.includes(state.sta) ? state.sta : line.stations[0];
+      trackEvent('select_mtr_line', {
+        line_code: lineCode,
+        line_name: getLineName(lineCode),
+        station_code: nextSta,
+        station_name: getStationName(nextSta),
+        language: state.lang
+      });
       selectStation(lineCode, nextSta);
     });
 
@@ -1267,11 +1477,60 @@
       }
     });
 
+    let searchTrackTimer = null;
+    function getSearchMatchCount(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return 0;
+      let count = 0;
+      Object.values(LINES).forEach(line => {
+        line.stations.forEach(staCode => {
+          const st = STATIONS[staCode];
+          if (
+            staCode.toLowerCase().includes(q) ||
+            st.en.toLowerCase().includes(q) ||
+            st.tc.toLowerCase().includes(q) ||
+            line.en.toLowerCase().includes(q) ||
+            line.tc.toLowerCase().includes(q)
+          ) {
+            count += 1;
+          }
+        });
+      });
+      return count;
+    }
+
     el.searchInput.addEventListener('input', e => {
-      renderSearchDropdown(e.target.value);
+      const val = e.target.value;
+      renderSearchDropdown(val);
+      if (searchTrackTimer) clearTimeout(searchTrackTimer);
+      const trimmed = val.trim();
+      if (trimmed.length >= 2) {
+        searchTrackTimer = setTimeout(() => {
+          trackEvent('search', {
+            search_term: trimmed,
+            results_count: getSearchMatchCount(trimmed),
+            language: state.lang
+          });
+        }, 700);
+      }
+    });
+
+    el.searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const trimmed = e.target.value.trim();
+        if (trimmed) {
+          if (searchTrackTimer) clearTimeout(searchTrackTimer);
+          trackEvent('search', {
+            search_term: trimmed,
+            results_count: getSearchMatchCount(trimmed),
+            language: state.lang
+          });
+        }
+      }
     });
 
     el.btnClearSearch.addEventListener('click', () => {
+      if (searchTrackTimer) clearTimeout(searchTrackTimer);
       el.searchInput.value = '';
       renderSearchDropdown('');
       el.searchInput.focus();
@@ -1280,6 +1539,22 @@
     el.searchResults.addEventListener('click', e => {
       const btn = e.target.closest('[data-search-line]');
       if (!btn) return;
+      const queryText = el.searchInput.value.trim();
+      if (searchTrackTimer) clearTimeout(searchTrackTimer);
+      if (queryText) {
+        trackEvent('search', {
+          search_term: queryText,
+          results_count: getSearchMatchCount(queryText),
+          language: state.lang
+        });
+      }
+      trackEvent('select_search_result', {
+        search_term: queryText,
+        selected_line: btn.dataset.searchLine,
+        selected_station: btn.dataset.searchSta,
+        station_name: getStationName(btn.dataset.searchSta),
+        language: state.lang
+      });
       selectStation(btn.dataset.searchLine, btn.dataset.searchSta);
       el.searchInput.value = '';
       el.searchResults.classList.add('hidden');
