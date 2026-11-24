@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HK MTR Real-Time Arrivals | 港鐵實時列車到站時間</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-page: #f4f6f9;
+      --bg-card: #ffffff;
+      --bg-subtle: #eef2f6;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --pids-bg: #f8fafc;
+      --pids-row: #ffffff;
+    }
+    html.dark {
+      --bg-page: #0b1120;
+      --bg-card: #131c31;
+      --bg-subtle: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --border-color: #273549;
+      --pids-bg: #0f172a;
+      --pids-row: #18233a;
+    }
+    body {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .surface-card {
+      background-color: var(--bg-card);
+      border-color: var(--border-color);
+    }
+    .surface-subtle {
+      background-color: var(--bg-subtle);
+    }
+    .pids-panel {
+      background-color: var(--pids-bg);
+      border-color: var(--border-color);
+    }
+    .pids-row {
+      background-color: var(--pids-row);
+      border-color: var(--border-color);
+    }
+    .text-main { color: var(--text-primary); }
+    .text-sub { color: var(--text-secondary); }
+    .text-mut { color: var(--text-muted); }
+    .border-base { border-color: var(--border-color); }
+
+    /* Custom subtle scrollbar for station strip */
+    .station-strip::-webkit-scrollbar {
+      height: 6px;
+    }
+    .station-strip::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .station-strip::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+    .live-dot {
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Top Navigation Bar -->
+  <header class="bg-[#001F3F] text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- MTR-inspired Emblem -->
+        <div class="w-9 h-9 rounded-lg bg-[#A6192E] flex items-center justify-center shrink-0 shadow-inner" aria-hidden="true">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <path d="M5 7c3.5 0 5.5 2.5 7 5 1.5-2.5 3.5-5 7-5" />
+            <path d="M5 17c3.5 0 5.5-2.5 7-5 1.5 2.5 3.5 5 7 5" />
+            <line x1="12" y1="3" x2="12" y2="21" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 id="app-title" class="text-base sm:text-lg font-bold tracking-tight truncate">HK MTR Real-Time Arrivals</h1>
+          <p id="app-subtitle" class="text-xs text-slate-300 truncate">Live Next Train Schedule · DATA.GOV.HK</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Language Toggle -->
+        <button id="btn-lang" type="button" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold tracking-wide transition cursor-pointer">
+          繁中 / EN
+        </button>
+        <!-- Theme Toggle -->
+        <button id="btn-theme" type="button" class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer" title="Toggle Dark/Light Theme">
+          <span id="theme-icon" aria-hidden="true">🌙</span>
+          <span id="theme-label" class="hidden sm:inline">Dark</span>
+        </button>
+        <!-- Auto Refresh Toggle -->
+        <button id="btn-auto" type="button" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+          <span id="auto-dot" class="w-2 h-2 rounded-full bg-emerald-400 live-dot"></span>
+          <span id="auto-label">10s</span>
+        </button>
+        <!-- Manual Refresh -->
+        <button id="btn-refresh" type="button" class="px-3 py-1.5 rounded-lg bg-white text-[#001F3F] hover:bg-slate-100 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm">
+          <svg id="refresh-spin" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
+          <span id="refresh-label">Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl w-full mx-auto px-4 py-5 space-y-4 flex-1">
+    <!-- Search & Favorites Row -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+      <!-- Station Search -->
+      <div class="lg:col-span-5 relative">
+        <label for="station-search" class="sr-only">Search station</label>
+        <div class="relative">
+          <svg class="w-4 h-4 text-mut absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            id="station-search"
+            type="text"
+            autocomplete="off"
+            placeholder="Search station (e.g. Admiralty, 金鐘, ADM)..."
+            class="w-full pl-10 pr-9 py-2.5 rounded-xl border surface-card text-main text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm"
+          />
+          <button id="btn-clear-search" type="button" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-mut hover:text-main p-1 cursor-pointer" aria-label="Clear search">
+            ✕
+          </button>
+        </div>
+        <!-- Search Dropdown -->
+        <div id="search-results" class="hidden absolute left-0 right-0 mt-1.5 rounded-xl border surface-card shadow-xl z-20 max-h-72 overflow-y-auto divide-y border-base"></div>
+      </div>
+
+      <!-- Saved Favorites -->
+      <div class="lg:col-span-7 surface-card border rounded-xl px-3.5 py-2.5 shadow-sm flex flex-wrap items-center gap-2 min-h-[44px]">
+        <span id="fav-heading" class="text-xs font-semibold uppercase tracking-wider text-mut shrink-0 mr-1">Pinned:</span>
+        <div id="favorites-list" class="flex flex-wrap items-center gap-1.5"></div>
+      </div>
+    </section>
+
+    <!-- Line Selector Pills -->
+    <section aria-label="MTR Lines" class="surface-card border rounded-2xl p-3 shadow-sm">
+      <div id="line-pills" class="flex flex-wrap gap-2"></div>
+    </section>
+
+    <!-- Interactive Route Strip for Selected Line -->
+    <section class="surface-card border rounded-2xl p-4 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5">
+          <span id="strip-line-badge" class="px-2.5 py-0.5 rounded-md text-white text-xs font-bold tracking-wider">TKL</span>
+          <h2 id="strip-line-name" class="text-sm font-bold text-main">Tseung Kwan O Line</h2>
+          <span id="strip-station-count" class="text-xs text-mut">8 stations</span>
+        </div>
+        <span id="strip-hint" class="text-xs text-mut">Click a station or interchange dot</span>
+      </div>
+      <div id="station-strip" class="station-strip flex items-start gap-1 overflow-x-auto pb-2 pt-1"></div>
+    </section>
+
+    <!-- Selected Station Header & Status Banner -->
+    <section id="station-board-wrapper" class="surface-card border rounded-2xl shadow-sm overflow-hidden">
+      <!-- Line Color Top Accent -->
+      <div id="board-accent" class="h-2 w-full bg-[#7D499D]"></div>
+
+      <div class="p-4 sm:p-5 border-b border-base flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <button id="btn-favorite" type="button" class="w-10 h-10 rounded-xl surface-subtle hover:opacity-90 flex items-center justify-center text-lg transition cursor-pointer shrink-0" title="Pin / Unpin Station">
+            <span id="fav-star">☆</span>
+          </button>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 id="active-station-name" class="text-xl sm:text-2xl font-extrabold tracking-tight text-main truncate">Tseung Kwan O</h2>
+              <span id="active-station-code" class="px-2 py-0.5 rounded-md text-xs font-mono font-bold surface-subtle text-sub">TKO</span>
+              <span id="delay-badge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                ⚠ Service Delay
+              </span>
+            </div>
+            <div id="active-interchanges" class="flex flex-wrap items-center gap-1.5 mt-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Timestamp & Connection Status -->
+        <div class="flex flex-col items-start sm:items-end text-xs">
+          <div class="flex items-center gap-2">
+            <span id="status-pill" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span id="status-text">Live</span>
+            </span>
+            <span id="hkt-clock" class="font-mono font-semibold text-sub">--:--:-- HKT</span>
+          </div>
+          <p id="last-updated" class="text-mut mt-1">Updated: --</p>
+        </div>
+      </div>
+
+      <!-- Alert / Error / Info Banner -->
+      <div id="alert-banner" class="hidden px-4 sm:px-5 py-3 border-b border-base"></div>
+
+      <!-- UP & DOWN Arrival Columns -->
+      <div class="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- UP Direction -->
+        <div class="pids-panel border rounded-xl overflow-hidden flex flex-col">
+          <div class="px-4 py-3 border-b border-base flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span id="up-arrow" class="w-6 h-6 rounded-md text-white text-xs font-bold flex items-center justify-center shrink-0">↑</span>
+              <div class="min-w-0">
+                <p id="up-dir-label" class="text-xs font-semibold uppercase tracking-wider text-mut">Towards</p>
+                <h3 id="up-dest-title" class="text-sm font-bold text-main truncate">Po Lam / LOHAS Park</h3>
+              </div>
+            </div>
+            <span id="up-count" class="text-xs font-mono text-mut shrink-0">0 trains</span>
+          </div>
+          <div id="up-list" class="p-3 space-y-2.5 flex-1"></div>
+        </div>
+
+        <!-- DOWN Direction -->
+        <div class="pids-panel border rounded-xl overflow-hidden flex flex-col">
+          <div class="px-4 py-3 border-b border-base flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span id="down-arrow" class="w-6 h-6 rounded-md text-white text-xs font-bold flex items-center justify-center shrink-0">↓</span>
+              <div class="min-w-0">
+                <p id="down-dir-label" class="text-xs font-semibold uppercase tracking-wider text-mut">Towards</p>
+                <h3 id="down-dest-title" class="text-sm font-bold text-main truncate">North Point / Tiu Keng Leng</h3>
+              </div>
+            </div>
+            <span id="down-count" class="text-xs font-mono text-mut shrink-0">0 trains</span>
+          </div>
+          <div id="down-list" class="p-3 space-y-2.5 flex-1"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="max-w-6xl w-full mx-auto px-4 py-4 text-xs text-mut flex flex-wrap items-center justify-between gap-2 border-t border-base">
+    <span id="footer-source">
+      Data: <a href="https://data.gov.hk/tc-data/dataset/mtr-data2-nexttrain-data/resource/10beffab-22f7-44be-9dd3-dbbd7fa534c3" target="_blank" rel="noopener noreferrer" class="underline hover:text-main">DATA.GOV.HK · MTR Next Train API (v1.7)</a> (updates every 10s)
+    </span>
+    <span id="footer-note">Times shown in Hong Kong Time (HKT, UTC+8)</span>
+  </footer>
+
+  <script>
+    // =========================================================================
+    // 1. GROUNDED MTR LINES, COLORS, STATIONS & DIRECTION METADATA (Spec v1.7)
+    // =========================================================================
+    const LINES = {
+      AEL: {
+        code: 'AEL', color: '#00888A',
+        en: 'Airport Express', tc: '機場快綫',
+        upEn: 'Airport / AsiaWorld-Expo', upTc: '機場 / 博覽館',
+        downEn: 'Hong Kong', downTc: '香港',
+        stations: ['HOK', 'KOW', 'TSY', 'AIR', 'AWE']
+      },
+      TCL: {
+        code: 'TCL', color: '#F7943E',
+        en: 'Tung Chung Line', tc: '東涌綫',
+        upEn: 'Tung Chung', upTc: '東涌',
+        downEn: 'Hong Kong', downTc: '香港',
+        stations: ['HOK', 'KOW', 'OLY', 'NAC', 'LAK', 'TSY', 'SUN', 'TUC']
+      },
+      TML: {
+        code: 'TML', color: '#923011',
+        en: 'Tuen Ma Line', tc: '屯馬綫',
+        upEn: 'Tuen Mun', upTc: '屯門',
+        downEn: 'Wu Kai Sha', downTc: '烏溪沙',
+        stations: ['WKS', 'MOS', 'HEO', 'TSH', 'SHM', 'CIO', 'STW', 'CKT', 'TAW', 'HIK', 'DIH', 'KAT', 'SUW', 'TKW', 'HOM', 'HUH', 'ETS', 'AUS', 'NAC', 'MEF', 'TWW', 'KSR', 'YUL', 'LOP', 'TIS', 'SIH', 'TUM']
+      },
+      TKL: {
+        code: 'TKL', color: '#7D499D',
+        en: 'Tseung Kwan O Line', tc: '將軍澳綫',
+        upEn: 'Po Lam / LOHAS Park', upTc: '寶琳 / 康城',
+        downEn: 'North Point / Tiu Keng Leng', downTc: '北角 / 調景嶺',
+        stations: ['NOP', 'QUB', 'YAT', 'TIK', 'TKO', 'LHP', 'HAH', 'POA']
+      },
+      EAL: {
+        code: 'EAL', color: '#53B7E8',
+        en: 'East Rail Line', tc: '東鐵綫',
+        upEn: 'Lo Wu / Lok Ma Chau / Sheung Shui', upTc: '羅湖 / 落馬洲 / 上水',
+        downEn: 'Admiralty / Hung Hom', downTc: '金鐘 / 紅磡',
+        stations: ['ADM', 'EXC', 'HUH', 'MKK', 'KOT', 'TAW', 'SHT', 'FOT', 'RAC', 'UNI', 'TAP', 'TWO', 'FAN', 'SHS', 'LOW', 'LMC']
+      },
+      SIL: {
+        code: 'SIL', color: '#BAC429',
+        en: 'South Island Line', tc: '南港島綫',
+        upEn: 'South Horizons', upTc: '海怡半島',
+        downEn: 'Admiralty', downTc: '金鐘',
+        stations: ['ADM', 'OCP', 'WCH', 'LET', 'SOH']
+      },
+      TWL: {
+        code: 'TWL', color: '#ED1D24',
+        en: 'Tsuen Wan Line', tc: '荃灣綫',
+        upEn: 'Tsuen Wan', upTc: '荃灣',
+        downEn: 'Central', downTc: '中環',
+        stations: ['CEN', 'ADM', 'TST', 'JOR', 'YMT', 'MOK', 'PRE', 'SSP', 'CSW', 'LCK', 'MEF', 'LAK', 'KWF', 'KWH', 'TWH', 'TSW']
+      },
+      ISL: {
+        code: 'ISL', color: '#007DC5',
+        en: 'Island Line', tc: '港島綫',
+        upEn: 'Chai Wan', upTc: '柴灣',
+        downEn: 'Kennedy Town', downTc: '堅尼地城',
+        stations: ['KET', 'HKU', 'SYP', 'SHW', 'CEN', 'ADM', 'WAC', 'CAB', 'TIH', 'FOH', 'NOP', 'QUB', 'TAK', 'SWH', 'SKW', 'HFC', 'CHW']
+      },
+      KTL: {
+        code: 'KTL', color: '#00AB4E',
+        en: 'Kwun Tong Line', tc: '觀塘綫',
+        upEn: 'Tiu Keng Leng', upTc: '調景嶺',
+        downEn: 'Whampoa', downTc: '黃埔',
+        stations: ['WHA', 'HOM', 'YMT', 'MOK', 'PRE', 'SKM', 'KOT', 'LOF', 'WTS', 'DIH', 'CHH', 'KOB', 'NTK', 'KWT', 'LAT', 'YAT', 'TIK']
+      },
+      DRL: {
+        code: 'DRL', color: '#F173AC',
+        en: 'Disneyland Resort Line', tc: '迪士尼綫',
+        upEn: 'Sunny Bay', upTc: '欣澳',
+        downEn: 'Disneyland Resort', downTc: '迪士尼',
+        stations: ['SUN', 'DIS']
+      }
+    };
+
+    const STATIONS = {
+      ADM: { en: 'Admiralty', tc: '金鐘' },
+      AIR: { en: 'Airport', tc: '機場' },
+      AUS: { en: 'Austin', tc: '柯士甸' },
+      AWE: { en: 'AsiaWorld-Expo', tc: '博覽館' },
+      CAB: { en: 'Causeway Bay', tc: '銅鑼灣' },
+      CEN: { en: 'Central', tc: '中環' },
+      CHH: { en: 'Choi Hung', tc: '彩虹' },
+      CHW: { en: 'Chai Wan', tc: '柴灣' },
+      CIO: { en: 'City One', tc: '第一城' },
+      CKT: { en: 'Che Kung Temple', tc: '車公廟' },
+      CSW: { en: 'Cheung Sha Wan', tc: '長沙灣' },
+      DIH: { en: 'Diamond Hill', tc: '鑽石山' },
+      DIS: { en: 'Disneyland Resort', tc: '迪士尼' },
+      ETS: { en: 'East Tsim Sha Tsui', tc: '尖東' },
+      EXC: { en: 'Exhibition Centre', tc: '會展' },
+      FAN: { en: 'Fanling', tc: '粉嶺' },
+      FOH: { en: 'Fortress Hill', tc: '炮台山' },
+      FOT: { en: 'Fo Tan', tc: '火炭' },
+      HAH: { en: 'Hang Hau', tc: '坑口' },
+      HEO: { en: 'Heng On', tc: '恆安' },
+      HFC: { en: 'Heng Fa Chuen', tc: '杏花邨' },
+      HIK: { en: 'Hin Keng', tc: '顯徑' },
+      HKU: { en: 'HKU', tc: '香港大學' },
+      HOK: { en: 'Hong Kong', tc: '香港' },
+      HOM: { en: 'Ho Man Tin', tc: '何文田' },
+      HUH: { en: 'Hung Hom', tc: '紅磡' },
+      JOR: { en: 'Jordan', tc: '佐敦' },
+      KAT: { en: 'Kai Tak', tc: '啟德' },
+      KET: { en: 'Kennedy Town', tc: '堅尼地城' },
+      KOB: { en: 'Kowloon Bay', tc: '九龍灣' },
+      KOT: { en: 'Kowloon Tong', tc: '九龍塘' },
+      KOW: { en: 'Kowloon', tc: '九龍' },
+      KSR: { en: 'Kam Sheung Road', tc: '錦上路' },
+      KWF: { en: 'Kwai Fong', tc: '葵芳' },
+      KWH: { en: 'Kwai Hing', tc: '葵興' },
+      KWT: { en: 'Kwun Tong', tc: '觀塘' },
+      LAK: { en: 'Lai King', tc: '荔景' },
+      LAT: { en: 'Lam Tin', tc: '藍田' },
+      LCK: { en: 'Lai Chi Kok', tc: '荔枝角' },
+      LET: { en: 'Lei Tung', tc: '利東' },
+      LHP: { en: 'LOHAS Park', tc: '康城' },
+      LMC: { en: 'Lok Ma Chau', tc: '落馬洲' },
+      LOF: { en: 'Lok Fu', tc: '樂富' },
+      LOP: { en: 'Long Ping', tc: '朗屏' },
+      LOW: { en: 'Lo Wu', tc: '羅湖' },
+      MEF: { en: 'Mei Foo', tc: '美孚' },
+      MKK: { en: 'Mong Kok East', tc: '旺角東' },
+      MOK: { en: 'Mong Kok', tc: '旺角' },
+      MOS: { en: 'Ma On Shan', tc: '馬鞍山' },
+      NAC: { en: 'Nam Cheong', tc: '南昌' },
+      NOP: { en: 'North Point', tc: '北角' },
+      NTK: { en: 'Ngau Tau Kok', tc: '牛頭角' },
+      OCP: { en: 'Ocean Park', tc: '海洋公園' },
+      OLY: { en: 'Olympic', tc: '奧運' },
+      POA: { en: 'Po Lam', tc: '寶琳' },
+      PRE: { en: 'Prince Edward', tc: '太子' },
+      QUB: { en: 'Quarry Bay', tc: '鰂魚涌' },
+      RAC: { en: 'Racecourse', tc: '馬場' },
+      SHM: { en: 'Shek Mun', tc: '石門' },
+      SHS: { en: 'Sheung Shui', tc: '上水' },
+      SHT: { en: 'Sha Tin', tc: '沙田' },
+      SHW: { en: 'Sheung Wan', tc: '上環' },
+      SIH: { en: 'Siu Hong', tc: '兆康' },
+      SKM: { en: 'Shek Kip Mei', tc: '石峽尾' },
+      SKW: { en: 'Shau Kei Wan', tc: '筲箕灣' },
+      SOH: { en: 'South Horizons', tc: '海怡半島' },
+      SSP: { en: 'Sham Shui Po', tc: '深水埗' },
+      STW: { en: 'Sha Tin Wai', tc: '沙田圍' },
+      SUN: { en: 'Sunny Bay', tc: '欣澳' },
+      SUW: { en: 'Sung Wong Toi', tc: '宋皇臺' },
+      SWH: { en: 'Sai Wan Ho', tc: '西灣河' },
+      SYP: { en: 'Sai Ying Pun', tc: '西營盤' },
+      TAK: { en: 'Tai Koo', tc: '太古' },
+      TAP: { en: 'Tai Po Market', tc: '大埔墟' },
+      TAW: { en: 'Tai Wai', tc: '大圍' },
+      TIH: { en: 'Tin Hau', tc: '天后' },
+      TIK: { en: 'Tiu Keng Leng', tc: '調景嶺' },
+      TIS: { en: 'Tin Shui Wai', tc: '天水圍' },
+      TKO: { en: 'Tseung Kwan O', tc: '將軍澳' },
+      TKW: { en: 'To Kwa Wan', tc: '土瓜灣' },
+      TSH: { en: 'Tai Shui Hang', tc: '大水坑' },
+      TST: { en: 'Tsim Sha Tsui', tc: '尖沙咀' },
+      TSW: { en: 'Tsuen Wan', tc: '荃灣' },
+      TSY: { en: 'Tsing Yi', tc: '青衣' },
+      TUC: { en: 'Tung Chung', tc: '東涌' },
+      TUM: { en: 'Tuen Mun', tc: '屯門' },
+      TWH: { en: 'Tai Wo Hau', tc: '大窩口' },
+      TWO: { en: 'Tai Wo', tc: '太和' },
+      TWW: { en: 'Tsuen Wan West', tc: '荃灣西' },
+      UNI: { en: 'University', tc: '大學' },
+      WAC: { en: 'Wan Chai', tc: '灣仔' },
+      WCH: { en: 'Wong Chuk Hang', tc: '黃竹坑' },
+      WHA: { en: 'Whampoa', tc: '黃埔' },
+      WKS: { en: 'Wu Kai Sha', tc: '烏溪沙' },
+      WTS: { en: 'Wong Tai Sin', tc: '黃大仙' },
+      YAT: { en: 'Yau Tong', tc: '油塘' },
+      YMT: { en: 'Yau Ma Tei', tc: '油麻地' },
+      YUL: { en: 'Yuen Long', tc: '元朗' }
+    };
+
+    // Build reverse lookup: station code -> array of line codes
+    const STATION_LINES = {};
+    Object.values(LINES).forEach(line => {
+      line.stations.forEach(sta => {
+        if (!STATION_LINES[sta]) STATION_LINES[sta] = [];
+        if (!STATION_LINES[sta].includes(line.code)) {
+          STATION_LINES[sta].push(line.code);
+        }
+      });
+    });
+
+    // =========================================================================
+    // 2. BILINGUAL UI DICTIONARY
+    // =========================================================================
+    const I18N = {
+      en: {
+        appTitle: 'HK MTR Real-Time Arrivals',
+        appSubtitle: 'Live Next Train Schedule · DATA.GOV.HK',
+        langBtn: '繁中',
+        darkLabel: 'Dark',
+        lightLabel: 'Light',
+        refresh: 'Refresh',
+        searchPlaceholder: 'Search station (e.g. Admiralty, 金鐘, ADM)...',
+        pinned: 'Pinned:',
+        noPinned: 'Click ☆ on a station to pin it here',
+        stationsUnit: 'stations',
+        stripHint: 'Click a station or interchange dot',
+        towards: 'Towards',
+        plat: 'Plat',
+        arriving: 'Arriving',
+        min: 'min',
+        mins: 'mins',
+        train: 'train',
+        trains: 'trains',
+        live: 'Live',
+        sampleMode: 'Sample Data',
+        errorStatus: 'Offline / Error',
+        loading: 'Fetching...',
+        updated: 'Updated:',
+        delay: 'Service Delay Reported',
+        noTrains: 'No upcoming trains scheduled at this time.',
+        dataAbsent: 'Real-time train data is currently unavailable (outside service hours or maintenance).',
+        viaRac: 'Via Racecourse',
+        arrival: 'Arrival',
+        departure: 'Departure',
+        retry: 'Retry Live API',
+        previewSample: 'Preview Sample Data',
+        apiErrorPrefix: 'Could not reach rt.data.gov.hk: ',
+        moreInfo: 'Service Notice Details',
+        interchangeWith: 'Interchange:'
+      },
+      tc: {
+        appTitle: '港鐵實時列車到站資訊',
+        appSubtitle: '實時班次預報 · DATA.GOV.HK',
+        langBtn: 'EN',
+        darkLabel: '深色',
+        lightLabel: '淺色',
+        refresh: '更新',
+        searchPlaceholder: '搜尋車站 (例如: 金鐘, Admiralty, ADM)...',
+        pinned: '常用車站：',
+        noPinned: '按車站旁的 ☆ 即可收藏',
+        stationsUnit: '個車站',
+        stripHint: '點選車站或轉乘圓點切換路綫',
+        towards: '往',
+        plat: '月台',
+        arriving: '即將到達',
+        min: '分鐘',
+        mins: '分鐘',
+        train: '班列車',
+        trains: '班列車',
+        live: '實時',
+        sampleMode: '範例數據',
+        errorStatus: '連線失敗',
+        loading: '更新中...',
+        updated: '更新時間：',
+        delay: '列車服務延誤',
+        noTrains: '暫時沒有即將到站的列車資料。',
+        dataAbsent: '暫時未能提供實時列車資料（可能為非服務時間）。',
+        viaRac: '經馬場',
+        arrival: '抵站',
+        departure: '開出',
+        retry: '重試實時連線',
+        previewSample: '預覽範例數據',
+        apiErrorPrefix: '無法連接 rt.data.gov.hk：',
+        moreInfo: '查看特別車務安排',
+        interchangeWith: '轉乘路綫：'
+      }
+    };
+
+    // =========================================================================
+    // 3. APPLICATION STATE
+    // =========================================================================
+    const DEFAULT_FAVORITES = [
+      { line: 'EAL', sta: 'ADM' },
+      { line: 'TWL', sta: 'CEN' },
+      { line: 'AEL', sta: 'HOK' }
+    ];
+
+    function loadStorage(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function saveStorage(key, val) {
+      try {
+        localStorage.setItem(key, JSON.stringify(val));
+      } catch {
+        // Ignore storage errors in restricted environments
+      }
+    }
+
+    const state = {
+      lang: loadStorage('mtr_lang', 'en'),
+      dark: loadStorage('mtr_dark', false),
+      line: loadStorage('mtr_line', 'TKL'),
+      sta: loadStorage('mtr_sta', 'TKO'),
+      favorites: loadStorage('mtr_favs', DEFAULT_FAVORITES),
+      autoRefresh: true,
+      countdown: 10,
+      loading: false,
+      isSample: false,
+      lastPayload: null,
+      lastError: null,
+      lastFetchedAt: null
+    };
+
+    // Validate stored line/sta
+    if (!LINES[state.line] || !LINES[state.line].stations.includes(state.sta)) {
+      state.line = 'TKL';
+      state.sta = 'TKO';
+    }
+
+    let fetchController = null;
+    let refreshTimer = null;
+
+    // =========================================================================
+    // 4. DOM REFERENCES
+    // =========================================================================
+    const el = {
+      appTitle: document.getElementById('app-title'),
+      appSubtitle: document.getElementById('app-subtitle'),
+      btnLang: document.getElementById('btn-lang'),
+      btnTheme: document.getElementById('btn-theme'),
+      themeIcon: document.getElementById('theme-icon'),
+      themeLabel: document.getElementById('theme-label'),
+      btnAuto: document.getElementById('btn-auto'),
+      autoDot: document.getElementById('auto-dot'),
+      autoLabel: document.getElementById('auto-label'),
+      btnRefresh: document.getElementById('btn-refresh'),
+      refreshSpin: document.getElementById('refresh-spin'),
+      refreshLabel: document.getElementById('refresh-label'),
+      searchInput: document.getElementById('station-search'),
+      btnClearSearch: document.getElementById('btn-clear-search'),
+      searchResults: document.getElementById('search-results'),
+      favHeading: document.getElementById('fav-heading'),
+      favoritesList: document.getElementById('favorites-list'),
+      linePills: document.getElementById('line-pills'),
+      stripLineBadge: document.getElementById('strip-line-badge'),
+      stripLineName: document.getElementById('strip-line-name'),
+      stripStationCount: document.getElementById('strip-station-count'),
+      stripHint: document.getElementById('strip-hint'),
+      stationStrip: document.getElementById('station-strip'),
+      boardAccent: document.getElementById('board-accent'),
+      btnFavorite: document.getElementById('btn-favorite'),
+      favStar: document.getElementById('fav-star'),
+      activeStationName: document.getElementById('active-station-name'),
+      activeStationCode: document.getElementById('active-station-code'),
+      delayBadge: document.getElementById('delay-badge'),
+      activeInterchanges: document.getElementById('active-interchanges'),
+      statusPill: document.getElementById('status-pill'),
+      statusText: document.getElementById('status-text'),
+      hktClock: document.getElementById('hkt-clock'),
+      lastUpdated: document.getElementById('last-updated'),
+      alertBanner: document.getElementById('alert-banner'),
+      upArrow: document.getElementById('up-arrow'),
+      upDirLabel: document.getElementById('up-dir-label'),
+      upDestTitle: document.getElementById('up-dest-title'),
+      upCount: document.getElementById('up-count'),
+      upList: document.getElementById('up-list'),
+      downArrow: document.getElementById('down-arrow'),
+      downDirLabel: document.getElementById('down-dir-label'),
+      downDestTitle: document.getElementById('down-dest-title'),
+      downCount: document.getElementById('down-count'),
+      downList: document.getElementById('down-list')
+    };
+
+    // =========================================================================
+    // 5. HELPERS
+    // =========================================================================
+    function t(key) {
+      return I18N[state.lang][key] || key;
+    }
+
+    function getStationName(code) {
+      const s = STATIONS[code];
+      if (!s) return code;
+      return state.lang === 'tc' ? s.tc : s.en;
+    }
+
+    function getLineName(code) {
+      const l = LINES[code];
+      if (!l) return code;
+      return state.lang === 'tc' ? l.tc : l.en;
+    }
+
+    // Parse "yyyy-MM-dd HH:mm:ss" safely without local-timezone offset distortion
+    function parseMtrTime(str) {
+      if (!str || str === '-') return null;
+      const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(str.trim());
+      if (!m) return null;
+      return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+    }
+
+    function computeMinutesDiff(currStr, targetStr) {
+      const currMs = parseMtrTime(currStr);
+      const targetMs = parseMtrTime(targetStr);
+      if (currMs === null || targetMs === null) return null;
+      return Math.max(0, Math.round((targetMs - currMs) / 60000));
+    }
+
+    function formatShortTime(str) {
+      if (!str || str === '-') return '--:--';
+      const parts = str.trim().split(' ');
+      return parts[1] ? parts[1].slice(0, 5) : str;
+    }
+
+    function isFavorite(line, sta) {
+      return state.favorites.some(f => f.line === line && f.sta === sta);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // =========================================================================
+    // 6. SAMPLE DATA GENERATOR (Based strictly on Spec v1.7 JSON schema)
+    // =========================================================================
+    function buildSamplePayload(lineCode, staCode) {
+      const now = new Date();
+      // Convert current UTC time to HKT (UTC+8)
+      const hkt = new Date(now.getTime() + 8 * 3600 * 1000);
+      const fmt = d => {
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+      };
+      const addMin = (d, mins) => new Date(d.getTime() + mins * 60000);
+      const currStr = fmt(hkt);
+      const line = LINES[lineCode];
+      const upDest = line.stations[line.stations.length - 1];
+      const downDest = line.stations[0];
+
+      const makeTrains = (dest, plat, offsets) =>
+        offsets.map((mins, idx) => {
+          const item = {
+            ttnt: String(mins),
+            valid: 'Y',
+            plat: String(plat),
+            time: fmt(addMin(hkt, mins)),
+            source: '-',
+            dest: dest === staCode ? (idx % 2 === 0 ? upDest : downDest) : dest,
+            seq: String(idx + 1)
+          };
+          if (lineCode === 'EAL') {
+            item.timetype = 'D';
+            item.route = '';
+          }
+          return item;
+        });
+
+      const key = `${lineCode}-${staCode}`;
+      return {
+        sys_time: currStr,
+        curr_time: currStr,
+        status: 1,
+        message: 'successful',
+        isdelay: 'N',
+        data: {
+          [key]: {
+            curr_time: currStr,
+            sys_time: currStr,
+            UP: staCode === upDest ? [] : makeTrains(upDest, '1', [1, 4, 8, 12]),
+            DOWN: staCode === downDest ? [] : makeTrains(downDest, '2', [2, 5, 9, 14])
+          }
+        }
+      };
+    }
+
+    // =========================================================================
+    // 7. LIVE API FETCH
+    // =========================================================================
+    async function fetchSchedule() {
+      if (fetchController) {
+        fetchController.abort();
+      }
+      fetchController = new AbortController();
+      const timeoutId = setTimeout(() => fetchController.abort(), 8000);
+
+      state.loading = true;
+      state.isSample = false;
+      renderStatusHeader();
+
+      const langParam = state.lang === 'tc' ? 'TC' : 'EN';
+      const url = `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${encodeURIComponent(state.line)}&sta=${encodeURIComponent(state.sta)}&lang=${langParam}`;
+
+      try {
+        const res = await fetch(url, { signal: fetchController.signal, cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const json = await res.json();
+        state.lastPayload = json;
+        state.lastError = null;
+        state.lastFetchedAt = new Date();
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          clearTimeout(timeoutId);
+          return;
+        }
+        state.lastError = err.message || 'Network error';
+      } finally {
+        clearTimeout(timeoutId);
+        state.loading = false;
+        state.countdown = 10;
+        renderBoard();
+      }
+    }
+
+    function selectStation(lineCode, staCode) {
+      if (!LINES[lineCode] || !LINES[lineCode].stations.includes(staCode)) return;
+      state.line = lineCode;
+      state.sta = staCode;
+      state.countdown = 10;
+      saveStorage('mtr_line', state.line);
+      saveStorage('mtr_sta', state.sta);
+      renderLinePills();
+      renderStationStrip();
+      renderStationHeader();
+      fetchSchedule();
+    }
+
+    // =========================================================================
+    // 8. RENDERING
+    // =========================================================================
+    function applyTheme() {
+      document.documentElement.classList.toggle('dark', state.dark);
+      el.themeIcon.textContent = state.dark ? '☀️' : '🌙';
+      el.themeLabel.textContent = state.dark ? t('lightLabel') : t('darkLabel');
+    }
+
+    function renderChromeText() {
+      el.appTitle.textContent = t('appTitle');
+      el.appSubtitle.textContent = t('appSubtitle');
+      el.btnLang.textContent = t('langBtn');
+      el.refreshLabel.textContent = t('refresh');
+      el.searchInput.placeholder = t('searchPlaceholder');
+      el.favHeading.textContent = t('pinned');
+      el.stripHint.textContent = t('stripHint');
+      el.upDirLabel.textContent = t('towards');
+      el.downDirLabel.textContent = t('towards');
+      applyTheme();
+      renderAutoButton();
+    }
+
+    function renderAutoButton() {
+      if (state.autoRefresh) {
+        el.btnAuto.className = 'px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer';
+        el.autoDot.className = 'w-2 h-2 rounded-full bg-emerald-400 live-dot';
+        el.autoLabel.textContent = `${state.countdown}s`;
+      } else {
+        el.btnAuto.className = 'px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer';
+        el.autoDot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        el.autoLabel.textContent = state.lang === 'tc' ? '暫停' : 'Paused';
+      }
+    }
+
+    function renderFavorites() {
+      if (!state.favorites.length) {
+        el.favoritesList.innerHTML = `<span class="text-xs text-mut italic">${escapeHtml(t('noPinned'))}</span>`;
+        return;
+      }
+      el.favoritesList.innerHTML = state.favorites.map((fav, idx) => {
+        const line = LINES[fav.line];
+        if (!line) return '';
+        const active = fav.line === state.line && fav.sta === state.sta;
+        return `
+          <button
+            type="button"
+            data-fav-idx="${idx}"
+            class="fav-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${active ? 'ring-2 ring-offset-1 ring-sky-500 border-sky-500 bg-sky-500/10 text-main' : 'surface-subtle border-base text-sub hover:text-main'}"
+          >
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${line.color}"></span>
+            <span>${escapeHtml(getStationName(fav.sta))}</span>
+            <span class="text-[10px] font-mono opacity-75">${escapeHtml(fav.line)}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderLinePills() {
+      el.linePills.innerHTML = Object.values(LINES).map(line => {
+        const active = line.code === state.line;
+        return `
+          <button
+            type="button"
+            data-line="${line.code}"
+            class="line-pill px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition cursor-pointer ${active ? 'text-white shadow-sm scale-[1.02]' : 'surface-subtle border-base text-main hover:opacity-85'}"
+            style="${active ? `background-color: ${line.color}; border-color: ${line.color};` : ''}"
+          >
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${active ? '#ffffff' : line.color}"></span>
+            <span>${escapeHtml(getLineName(line.code))}</span>
+            <span class="text-[10px] font-mono ${active ? 'text-white/90' : 'text-mut'}">${line.code}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderStationStrip() {
+      const line = LINES[state.line];
+      el.stripLineBadge.textContent = line.code;
+      el.stripLineBadge.style.backgroundColor = line.color;
+      el.stripLineName.textContent = getLineName(line.code);
+      el.stripStationCount.textContent = `${line.stations.length} ${t('stationsUnit')}`;
+
+      el.stationStrip.innerHTML = line.stations.map((staCode, idx) => {
+        const active = staCode === state.sta;
+        const interchanges = (STATION_LINES[staCode] || []).filter(c => c !== state.line);
+        return `
+          <div class="flex flex-col items-center min-w-[74px] max-w-[92px] relative group">
+            <!-- Connecting track line -->
+            <div class="w-full flex items-center justify-center relative h-6">
+              ${idx > 0 ? `<div class="absolute left-0 right-1/2 h-1 top-1/2 -translate-y-1/2" style="background-color: ${line.color}; opacity: 0.45;"></div>` : ''}
+              ${idx < line.stations.length - 1 ? `<div class="absolute left-1/2 right-0 h-1 top-1/2 -translate-y-1/2" style="background-color: ${line.color}; opacity: 0.45;"></div>` : ''}
+              <button
+                type="button"
+                data-strip-sta="${staCode}"
+                class="relative z-10 rounded-full transition cursor-pointer flex items-center justify-center ${active ? 'w-5 h-5 ring-4 ring-offset-2' : 'w-3.5 h-3.5 bg-white border-2 hover:scale-125'}"
+                style="border-color: ${line.color}; ${active ? `background-color: ${line.color}; --tw-ring-color: ${line.color}40;` : ''}"
+                title="${escapeHtml(getStationName(staCode))} (${staCode})"
+              ></button>
+            </div>
+            <button
+              type="button"
+              data-strip-sta="${staCode}"
+              class="mt-1 px-1 text-center text-[11px] leading-tight cursor-pointer transition ${active ? 'font-extrabold text-main' : 'font-medium text-sub hover:text-main'}"
+            >
+              ${escapeHtml(getStationName(staCode))}
+            </button>
+            ${interchanges.length ? `
+              <div class="flex items-center justify-center gap-1 mt-1">
+                ${interchanges.map(ic => `
+                  <button
+                    type="button"
+                    data-jump-line="${ic}"
+                    data-jump-sta="${staCode}"
+                    class="w-2.5 h-2.5 rounded-full hover:scale-125 transition cursor-pointer border border-white/60"
+                    style="background-color: ${LINES[ic].color}"
+                    title="${escapeHtml(getLineName(ic))}"
+                  ></button>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      // Scroll active station into view smoothly
+      requestAnimationFrame(() => {
+        const activeBtn = el.stationStrip.querySelector(`[data-strip-sta="${state.sta}"]`);
+        if (activeBtn) {
+          activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+      });
+    }
+
+    function renderStationHeader() {
+      const line = LINES[state.line];
+      el.boardAccent.style.backgroundColor = line.color;
+      el.upArrow.style.backgroundColor = line.color;
+      el.downArrow.style.backgroundColor = line.color;
+
+      el.activeStationName.textContent = getStationName(state.sta);
+      el.activeStationCode.textContent = state.sta;
+
+      const starred = isFavorite(state.line, state.sta);
+      el.favStar.textContent = starred ? '★' : '☆';
+      el.favStar.className = starred ? 'text-amber-500' : 'text-mut';
+
+      const interchanges = (STATION_LINES[state.sta] || []).filter(c => c !== state.line);
+      if (interchanges.length) {
+        el.activeInterchanges.innerHTML = `
+          <span class="text-xs text-mut mr-1">${escapeHtml(t('interchangeWith'))}</span>
+          ${interchanges.map(ic => `
+            <button
+              type="button"
+              data-jump-line="${ic}"
+              data-jump-sta="${state.sta}"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold text-white hover:opacity-90 transition cursor-pointer"
+              style="background-color: ${LINES[ic].color}"
+            >
+              <span>${escapeHtml(getLineName(ic))}</span>
+            </button>
+          `).join('')}
+        `;
+      } else {
+        el.activeInterchanges.innerHTML = '';
+      }
+
+      el.upDestTitle.textContent = state.lang === 'tc' ? line.upTc : line.upEn;
+      el.downDestTitle.textContent = state.lang === 'tc' ? line.downTc : line.downEn;
+    }
+
+    function renderStatusHeader() {
+      el.refreshSpin.classList.toggle('animate-spin', state.loading);
+
+      if (state.loading) {
+        el.statusPill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300';
+        el.statusPill.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span><span>${escapeHtml(t('loading'))}</span>`;
+      } else if (state.isSample) {
+        el.statusPill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300';
+        el.statusPill.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span><span>${escapeHtml(t('sampleMode'))}</span>`;
+      } else if (state.lastError) {
+        el.statusPill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300';
+        el.statusPill.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span>${escapeHtml(t('errorStatus'))}</span>`;
+      } else {
+        el.statusPill.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
+        el.statusPill.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot"></span><span>${escapeHtml(t('live'))}</span>`;
+      }
+
+      if (state.lastFetchedAt) {
+        const pad = n => String(n).padStart(2, '0');
+        const d = state.lastFetchedAt;
+        el.lastUpdated.textContent = `${t('updated')} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      }
+    }
+
+    function renderTrainRows(container, countEl, trains, currTime) {
+      const list = Array.isArray(trains) ? trains : [];
+      countEl.textContent = `${list.length} ${list.length === 1 ? t('train') : t('trains')}`;
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="pids-row border rounded-lg p-5 text-center text-xs text-mut">
+            ${escapeHtml(t('noTrains'))}
+          </div>
+        `;
+        return;
+      }
+
+      const lineColor = LINES[state.line].color;
+
+      container.innerHTML = list.map(tr => {
+        const mins = computeMinutesDiff(currTime, tr.time);
+        let etaText = '--';
+        let etaHighlight = false;
+        if (mins !== null) {
+          if (mins <= 0) {
+            etaText = t('arriving');
+            etaHighlight = true;
+          } else if (mins === 1) {
+            etaText = `1 ${t('min')}`;
+            etaHighlight = true;
+          } else {
+            etaText = `${mins} ${t('mins')}`;
+          }
+        }
+
+        const badges = [];
+        if (tr.timetype === 'A') {
+          badges.push(`<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/15 text-sky-600 dark:text-sky-300">${escapeHtml(t('arrival'))}</span>`);
+        } else if (tr.timetype === 'D') {
+          badges.push(`<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">${escapeHtml(t('departure'))}</span>`);
+        }
+        if (tr.route === 'RAC') {
+          badges.push(`<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-600 dark:text-purple-300">${escapeHtml(t('viaRac'))}</span>`);
+        }
+
+        return `
+          <div class="pids-row border rounded-xl px-3.5 py-3 flex items-center justify-between gap-3 transition">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 surface-subtle text-sub">
+                ${escapeHtml(tr.seq || '-')}
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="font-bold text-sm sm:text-base text-main truncate">${escapeHtml(getStationName(tr.dest))}</span>
+                  <span class="text-[10px] font-mono text-mut">${escapeHtml(tr.dest || '')}</span>
+                  ${badges.join('')}
+                </div>
+                <div class="flex items-center gap-2 mt-0.5 text-xs text-mut">
+                  <span class="inline-flex items-center gap-1 font-medium">
+                    <span class="w-4 h-4 rounded-full text-white text-[10px] font-bold inline-flex items-center justify-center" style="background-color: ${lineColor}">
+                      ${escapeHtml(tr.plat || '-')}
+                    </span>
+                    ${escapeHtml(t('plat'))} ${escapeHtml(tr.plat || '-')}
+                  </span>
+                  <span>·</span>
+                  <span class="font-mono">${escapeHtml(formatShortTime(tr.time))}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-right shrink-0">
+              <span class="text-base sm:text-lg font-extrabold tracking-tight ${etaHighlight ? 'text-emerald-600 dark:text-emerald-400' : 'text-main'}">
+                ${escapeHtml(etaText)}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderBoard() {
+      renderStatusHeader();
+      el.delayBadge.classList.add('hidden');
+      el.alertBanner.classList.add('hidden');
+      el.alertBanner.innerHTML = '';
+
+      if (state.lastError && !state.isSample) {
+        el.alertBanner.className = 'px-4 sm:px-5 py-3 border-b border-base bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs flex flex-wrap items-center justify-between gap-2';
+        el.alertBanner.innerHTML = `
+          <span><strong>${escapeHtml(t('apiErrorPrefix'))}</strong>${escapeHtml(state.lastError)}</span>
+          <div class="flex items-center gap-2">
+            <button id="btn-retry-inline" type="button" class="px-2.5 py-1 rounded-md bg-rose-600 text-white font-semibold hover:bg-rose-700 cursor-pointer">${escapeHtml(t('retry'))}</button>
+            <button id="btn-sample-inline" type="button" class="px-2.5 py-1 rounded-md border border-rose-500/40 font-semibold hover:bg-rose-500/10 cursor-pointer">${escapeHtml(t('previewSample'))}</button>
+          </div>
+        `;
+        el.alertBanner.classList.remove('hidden');
+        el.hktClock.textContent = '--:--:-- HKT';
+        renderTrainRows(el.upList, el.upCount, [], null);
+        renderTrainRows(el.downList, el.downCount, [], null);
+        return;
+      }
+
+      const payload = state.lastPayload;
+      if (!payload) {
+        renderTrainRows(el.upList, el.upCount, [], null);
+        renderTrainRows(el.downList, el.downCount, [], null);
+        return;
+      }
+
+      // Status 0: Special train service arrangements or suspended station
+      if (payload.status === 0) {
+        const msg = payload.message || 'Special train service arrangements are in place.';
+        const linkHtml = payload.url
+          ? `<a href="${escapeHtml(payload.url)}" target="_blank" rel="noopener noreferrer" class="underline font-bold ml-2">${escapeHtml(t('moreInfo'))} ↗</a>`
+          : '';
+        el.alertBanner.className = 'px-4 sm:px-5 py-3 border-b border-base bg-amber-500/15 text-amber-800 dark:text-amber-200 text-xs sm:text-sm font-medium';
+        el.alertBanner.innerHTML = `⚠ ${escapeHtml(msg)} ${linkHtml}`;
+        el.alertBanner.classList.remove('hidden');
+        el.hktClock.textContent = (payload.cur_time || payload.curr_time || '--:--:--') + ' HKT';
+        renderTrainRows(el.upList, el.upCount, [], null);
+        renderTrainRows(el.downList, el.downCount, [], null);
+        return;
+      }
+
+      if (payload.isdelay === 'Y') {
+        el.delayBadge.textContent = `⚠ ${t('delay')}`;
+        el.delayBadge.classList.remove('hidden');
+      }
+
+      const key = `${state.line}-${state.sta}`;
+      const staData = payload.data && payload.data[key] ? payload.data[key] : {};
+      const currTime = staData.curr_time || payload.curr_time || '-';
+
+      if (currTime === '-') {
+        el.hktClock.textContent = '--:--:-- HKT';
+        el.alertBanner.className = 'px-4 sm:px-5 py-3 border-b border-base bg-slate-500/10 text-sub text-xs';
+        el.alertBanner.textContent = t('dataAbsent');
+        el.alertBanner.classList.remove('hidden');
+      } else {
+        const parts = currTime.split(' ');
+        el.hktClock.textContent = `${parts[1] || currTime} HKT`;
+      }
+
+      renderTrainRows(el.upList, el.upCount, staData.UP || [], currTime);
+      renderTrainRows(el.downList, el.downCount, staData.DOWN || [], currTime);
+    }
+
+    // =========================================================================
+    // 9. SEARCH & EVENT HANDLERS
+    // =========================================================================
+    function renderSearchDropdown(query) {
+      const q = query.trim().toLowerCase();
+      el.btnClearSearch.classList.toggle('hidden', !q);
+      if (!q) {
+        el.searchResults.classList.add('hidden');
+        el.searchResults.innerHTML = '';
+        return;
+      }
+
+      const matches = [];
+      Object.values(LINES).forEach(line => {
+        line.stations.forEach(staCode => {
+          const st = STATIONS[staCode];
+          if (
+            staCode.toLowerCase().includes(q) ||
+            st.en.toLowerCase().includes(q) ||
+            st.tc.toLowerCase().includes(q) ||
+            line.en.toLowerCase().includes(q) ||
+            line.tc.toLowerCase().includes(q)
+          ) {
+            matches.push({ line: line.code, sta: staCode });
+          }
+        });
+      });
+
+      if (!matches.length) {
+        el.searchResults.innerHTML = `<div class="px-4 py-3 text-xs text-mut">${state.lang === 'tc' ? '找不到相符車站' : 'No matching stations found'}</div>`;
+        el.searchResults.classList.remove('hidden');
+        return;
+      }
+
+      el.searchResults.innerHTML = matches.slice(0, 20).map(m => {
+        const line = LINES[m.line];
+        return `
+          <button
+            type="button"
+            data-search-line="${m.line}"
+            data-search-sta="${m.sta}"
+            class="w-full px-4 py-2.5 text-left hover:bg-sky-500/10 flex items-center justify-between gap-2 transition cursor-pointer"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${line.color}"></span>
+              <span class="font-semibold text-sm text-main truncate">${escapeHtml(STATIONS[m.sta].en)} · ${escapeHtml(STATIONS[m.sta].tc)}</span>
+              <span class="text-xs font-mono text-mut">${m.sta}</span>
+            </div>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded text-white shrink-0" style="background-color: ${line.color}">
+              ${escapeHtml(getLineName(m.line))}
+            </span>
+          </button>
+        `;
+      }).join('');
+      el.searchResults.classList.remove('hidden');
+    }
+
+    function startAutoRefreshTimer() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(() => {
+        if (!state.autoRefresh || state.loading) return;
+        state.countdown -= 1;
+        if (state.countdown <= 0) {
+          state.countdown = 10;
+          fetchSchedule();
+        }
+        renderAutoButton();
+      }, 1000);
+    }
+
+    // Event Listeners
+    el.btnLang.addEventListener('click', () => {
+      state.lang = state.lang === 'en' ? 'tc' : 'en';
+      saveStorage('mtr_lang', state.lang);
+      renderChromeText();
+      renderFavorites();
+      renderLinePills();
+      renderStationStrip();
+      renderStationHeader();
+      fetchSchedule();
+    });
+
+    el.btnTheme.addEventListener('click', () => {
+      state.dark = !state.dark;
+      saveStorage('mtr_dark', state.dark);
+      applyTheme();
+    });
+
+    el.btnAuto.addEventListener('click', () => {
+      state.autoRefresh = !state.autoRefresh;
+      if (state.autoRefresh) state.countdown = 10;
+      renderAutoButton();
+    });
+
+    el.btnRefresh.addEventListener('click', () => {
+      state.countdown = 10;
+      renderAutoButton();
+      fetchSchedule();
+    });
+
+    el.btnFavorite.addEventListener('click', () => {
+      const exists = isFavorite(state.line, state.sta);
+      if (exists) {
+        state.favorites = state.favorites.filter(f => !(f.line === state.line && f.sta === state.sta));
+      } else {
+        state.favorites = [{ line: state.line, sta: state.sta }, ...state.favorites].slice(0, 10);
+      }
+      saveStorage('mtr_favs', state.favorites);
+      renderFavorites();
+      renderStationHeader();
+    });
+
+    el.favoritesList.addEventListener('click', e => {
+      const btn = e.target.closest('[data-fav-idx]');
+      if (!btn) return;
+      const fav = state.favorites[Number(btn.dataset.favIdx)];
+      if (fav) selectStation(fav.line, fav.sta);
+    });
+
+    el.linePills.addEventListener('click', e => {
+      const btn = e.target.closest('[data-line]');
+      if (!btn) return;
+      const lineCode = btn.dataset.line;
+      const line = LINES[lineCode];
+      if (!line) return;
+      // Keep current station if it exists on the new line; otherwise pick first station
+      const nextSta = line.stations.includes(state.sta) ? state.sta : line.stations[0];
+      selectStation(lineCode, nextSta);
+    });
+
+    el.stationStrip.addEventListener('click', e => {
+      const jumpBtn = e.target.closest('[data-jump-line]');
+      if (jumpBtn) {
+        selectStation(jumpBtn.dataset.jumpLine, jumpBtn.dataset.jumpSta);
+        return;
+      }
+      const staBtn = e.target.closest('[data-strip-sta]');
+      if (staBtn) {
+        selectStation(state.line, staBtn.dataset.stripSta);
+      }
+    });
+
+    el.activeInterchanges.addEventListener('click', e => {
+      const jumpBtn = e.target.closest('[data-jump-line]');
+      if (jumpBtn) {
+        selectStation(jumpBtn.dataset.jumpLine, jumpBtn.dataset.jumpSta);
+      }
+    });
+
+    el.searchInput.addEventListener('input', e => {
+      renderSearchDropdown(e.target.value);
+    });
+
+    el.btnClearSearch.addEventListener('click', () => {
+      el.searchInput.value = '';
+      renderSearchDropdown('');
+      el.searchInput.focus();
+    });
+
+    el.searchResults.addEventListener('click', e => {
+      const btn = e.target.closest('[data-search-line]');
+      if (!btn) return;
+      selectStation(btn.dataset.searchLine, btn.dataset.searchSta);
+      el.searchInput.value = '';
+      el.searchResults.classList.add('hidden');
+      el.btnClearSearch.classList.add('hidden');
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#station-search') && !e.target.closest('#search-results')) {
+        el.searchResults.classList.add('hidden');
+      }
+    });
+
+    el.alertBanner.addEventListener('click', e => {
+      if (e.target.id === 'btn-retry-inline') {
+        fetchSchedule();
+      } else if (e.target.id === 'btn-sample-inline') {
+        state.isSample = true;
+        state.lastError = null;
+        state.lastPayload = buildSamplePayload(state.line, state.sta);
+        state.lastFetchedAt = new Date();
+        renderBoard();
+      }
+    });
+
+    // =========================================================================
+    // 10. INITIALIZATION
+    // =========================================================================
+    renderChromeText();
+    renderFavorites();
+    renderLinePills();
+    renderStationStrip();
+    renderStationHeader();
+    startAutoRefreshTimer();
+    fetchSchedule();
+  </script>
+</body>
+</html>
